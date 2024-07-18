@@ -1,0 +1,27 @@
+Our Signing Shortcut Script
+
+When updating a provisioning profile or the entitlements of an already compiled app, we found ourselves repeating the same steps over and over again: unzipping the file, replacing the embedded.mobileprovision file, resigning the .app file, and packaging back up the .ipa. It wasn’t saving any time over simply going through Xcode–so we wrote a small bash script that does all the nitty-gritty work for us and we’d like to share it with you:
+
+http://git.io/floatsign
+
+This script will take a signed or unsigned app (either .ipa or .app), sign it, and package it up into a new .ipa file.
+
+./floatsign source identity -p "path/to/profile" -e "path/to/entitlements" target
+
+source 	The .ipa or .app file that needs signing.
+identity 	The name of the code signing identity to use (e.g. iPhone Developer: Daniel Pfeiffer (ABC1234567)).
+This is your development/distribution certificate provided by Apple. You can find out the common name of this certificate by looking in Keychain Access (we find it helpful to filter the list by clicking on “My Certificates” in the left column).
+target 	The target for the newly-signed .ipa file.
+
+This likely won’t cover every possible requirement in signing an iOS application, but it has been very helpful in our development process and we hope you find it to be helpful too. If you make any improvements to the script, please let us know in the comments or by making a Pull request on Github!
+
+If you’re not the Terminal type, Brian Gorby (http://www.gorbster.net/) has created a droplet app for Mac, AppResigner, that does the same thing (but just with .app files; you’ll have to do the unzipping and zipping yourself if you only have a .ipa file).
+
+Wish you could find some books about mobile development? Wondering how much a mobile app costs?
+
+Interested in learning more about mobile development? Wish you could find some books about mobile development. Wondering how much a mobile app costs? Maybe your organization is looking to create its first mobile learning application. Contact us to learn more!
+Follow Float
+
+
+example:
+floatsign.sh LianAiAppStore.ipa 'iPhone Distribution: pan guo (BGBCZBWWPH)' -p './sma11caseMNStore.mobileprovision' -e './LianAi.entitlements' ./new.ipa

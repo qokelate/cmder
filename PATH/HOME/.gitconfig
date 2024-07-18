@@ -1,0 +1,13 @@
+[user]
+	name = sma11case
+	email = udf.q@qq.com
+[core]
+	quotepath = false
+	pager = /usr/bin/less
+	autocrlf = false
+[gui]
+	encoding = utf-8
+[i18n "commit"]
+	encoding = utf-8
+[i18n]
+	logoutputencoding = utf-8
