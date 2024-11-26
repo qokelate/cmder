@@ -190,9 +190,6 @@ func (fd *netFD) accept() (netfd *netFD, err error) {
 	return netfd, nil
 }
 
-// Defined in os package.
-func newUnixFile(fd uintptr, name string) *os.File
-
 func (fd *netFD) dup() (f *os.File, err error) {
 	ns, call, err := fd.pfd.Dup()
 	if err != nil {
@@ -202,5 +199,5 @@ func (fd *netFD) dup() (f *os.File, err error) {
 		return nil, err
 	}
 
-	return newUnixFile(uintptr(ns), fd.name()), nil
+	return os.NewFile(uintptr(ns), fd.name()), nil
 }

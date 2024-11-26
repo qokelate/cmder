@@ -10,7 +10,6 @@ import (
 	"cmd/go/internal/mvs"
 	"cmd/go/internal/par"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -690,8 +689,8 @@ func updateWorkspaceRoots(ctx context.Context, rs *Requirements, add []module.Ve
 // roots) until the set of roots has converged.
 func tidyPrunedRoots(ctx context.Context, mainModule module.Version, direct map[string]bool, pkgs []*loadPkg) (*Requirements, error) {
 	var (
-		roots      []module.Version
-		pathIsRoot = map[string]bool{mainModule.Path: true}
+		roots        []module.Version
+		pathIncluded = map[string]bool{mainModule.Path: true}
 	)
 	// We start by adding roots for every package in "all".
 	//
@@ -711,9 +710,9 @@ func tidyPrunedRoots(ctx context.Context, mainModule module.Version, direct map[
 		if !pkg.flags.has(pkgInAll) {
 			continue
 		}
-		if pkg.fromExternalModule() && !pathIsRoot[pkg.mod.Path] {
+		if pkg.fromExternalModule() && !pathIncluded[pkg.mod.Path] {
 			roots = append(roots, pkg.mod)
-			pathIsRoot[pkg.mod.Path] = true
+			pathIncluded[pkg.mod.Path] = true
 		}
 		queue = append(queue, pkg)
 		queued[pkg] = true
@@ -745,12 +744,11 @@ func tidyPrunedRoots(ctx context.Context, mainModule module.Version, direct map[
 				queue = append(queue, pkg.test)
 				queued[pkg.test] = true
 			}
-
-			if !pathIsRoot[m.Path] {
+			if !pathIncluded[m.Path] {
 				if s := mg.Selected(m.Path); cmpVersion(s, m.Version) < 0 {
 					roots = append(roots, m)
-					pathIsRoot[m.Path] = true
 				}
+				pathIncluded[m.Path] = true
 			}
 		}
 
@@ -760,62 +758,10 @@ func tidyPrunedRoots(ctx context.Context, mainModule module.Version, direct map[
 		}
 	}
 
-	roots = tidy.rootModules
 	_, err := tidy.Graph(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	// We try to avoid adding explicit requirements for test-only dependencies of
-	// packages in external modules. However, if we drop the explicit
-	// requirements, that may change an import from unambiguous (due to lazy
-	// module loading) to ambiguous (because lazy module loading no longer
-	// disambiguates it). For any package that has become ambiguous, we try
-	// to fix it by promoting its module to an explicit root.
-	// (See https://go.dev/issue/60313.)
-	q := par.NewQueue(runtime.GOMAXPROCS(0))
-	for {
-		var disambiguateRoot sync.Map
-		for _, pkg := range pkgs {
-			if pkg.mod.Path == "" || pathIsRoot[pkg.mod.Path] {
-				// Lazy module loading will cause pkg.mod to be checked before any other modules
-				// that are only indirectly required. It is as unambiguous as possible.
-				continue
-			}
-			pkg := pkg
-			q.Add(func() {
-				skipModFile := true
-				_, _, _, _, err := importFromModules(ctx, pkg.path, tidy, nil, skipModFile)
-				if aie := (*AmbiguousImportError)(nil); errors.As(err, &aie) {
-					disambiguateRoot.Store(pkg.mod, true)
-				}
-			})
-		}
-		<-q.Idle()
-
-		disambiguateRoot.Range(func(k, _ any) bool {
-			m := k.(module.Version)
-			roots = append(roots, m)
-			pathIsRoot[m.Path] = true
-			return true
-		})
-
-		if len(roots) > len(tidy.rootModules) {
-			module.Sort(roots)
-			tidy = newRequirements(pruned, roots, tidy.direct)
-			_, err = tidy.Graph(ctx)
-			if err != nil {
-				return nil, err
-			}
-			// Adding these roots may have pulled additional modules into the module
-			// graph, causing additional packages to become ambiguous. Keep iterating
-			// until we reach a fixed point.
-			continue
-		}
-
-		break
-	}
-
 	return tidy, nil
 }
 

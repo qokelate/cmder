@@ -308,7 +308,6 @@ func TestDetectNohup(t *testing.T) {
 			t.Errorf("ran test with -check_sighup_ignored and it succeeded: expected failure.\nOutput:\n%s", out)
 		}
 		Stop(c)
-
 		// Again, this time with nohup, assuming we can find it.
 		_, err := os.Stat("/usr/bin/nohup")
 		if err != nil {
@@ -321,13 +320,6 @@ func TestDetectNohup(t *testing.T) {
 		data, _ := os.ReadFile("nohup.out")
 		os.Remove("nohup.out")
 		if err != nil {
-			// nohup doesn't work on new LUCI darwin builders due to the
-			// type of launchd service the test run under. See
-			// https://go.dev/issue/63875.
-			if runtime.GOOS == "darwin" && strings.Contains(string(out), "nohup: can't detach from console: Inappropriate ioctl for device") {
-				t.Skip("Skipping nohup test due to darwin builder limitation. See https://go.dev/issue/63875.")
-			}
-
 			t.Errorf("ran test with -check_sighup_ignored under nohup and it failed: expected success.\nError: %v\nOutput:\n%s%s", err, out, data)
 		}
 	}
@@ -416,6 +408,12 @@ func TestStop(t *testing.T) {
 
 // Test that when run under nohup, an uncaught SIGHUP does not kill the program.
 func TestNohup(t *testing.T) {
+	// Ugly: ask for SIGHUP so that child will not have no-hup set
+	// even if test is running under nohup environment.
+	// We have no intention of reading from c.
+	c := make(chan os.Signal, 1)
+	Notify(c, syscall.SIGHUP)
+
 	// When run without nohup, the test should crash on an uncaught SIGHUP.
 	// When run under nohup, the test should ignore uncaught SIGHUPs,
 	// because the runtime is not supposed to be listening for them.
@@ -427,102 +425,88 @@ func TestNohup(t *testing.T) {
 	//
 	// Both should fail without nohup and succeed with nohup.
 
-	t.Run("uncaught", func(t *testing.T) {
-		// Ugly: ask for SIGHUP so that child will not have no-hup set
-		// even if test is running under nohup environment.
-		// We have no intention of reading from c.
-		c := make(chan os.Signal, 1)
-		Notify(c, syscall.SIGHUP)
-		t.Cleanup(func() { Stop(c) })
+	var subTimeout time.Duration
 
-		var subTimeout time.Duration
-		if deadline, ok := t.Deadline(); ok {
-			subTimeout = time.Until(deadline)
-			subTimeout -= subTimeout / 10 // Leave 10% headroom for propagating output.
-		}
-		for i := 1; i <= 2; i++ {
-			i := i
-			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				t.Parallel()
+	var wg sync.WaitGroup
+	wg.Add(2)
+	if deadline, ok := t.Deadline(); ok {
+		subTimeout = time.Until(deadline)
+		subTimeout -= subTimeout / 10 // Leave 10% headroom for propagating output.
+	}
+	for i := 1; i <= 2; i++ {
+		i := i
+		go t.Run(fmt.Sprintf("uncaught-%d", i), func(t *testing.T) {
+			defer wg.Done()
 
-				args := []string{
-					"-test.v",
-					"-test.run=TestStop",
-					"-send_uncaught_sighup=" + strconv.Itoa(i),
-					"-die_from_sighup",
-				}
-				if subTimeout != 0 {
-					args = append(args, fmt.Sprintf("-test.timeout=%v", subTimeout))
-				}
-				out, err := testenv.Command(t, os.Args[0], args...).CombinedOutput()
+			args := []string{
+				"-test.v",
+				"-test.run=TestStop",
+				"-send_uncaught_sighup=" + strconv.Itoa(i),
+				"-die_from_sighup",
+			}
+			if subTimeout != 0 {
+				args = append(args, fmt.Sprintf("-test.timeout=%v", subTimeout))
+			}
+			out, err := exec.Command(os.Args[0], args...).CombinedOutput()
 
-				if err == nil {
-					t.Errorf("ran test with -send_uncaught_sighup=%d and it succeeded: expected failure.\nOutput:\n%s", i, out)
-				} else {
-					t.Logf("test with -send_uncaught_sighup=%d failed as expected.\nError: %v\nOutput:\n%s", i, err, out)
-				}
-			})
-		}
-	})
+			if err == nil {
+				t.Errorf("ran test with -send_uncaught_sighup=%d and it succeeded: expected failure.\nOutput:\n%s", i, out)
+			} else {
+				t.Logf("test with -send_uncaught_sighup=%d failed as expected.\nError: %v\nOutput:\n%s", i, err, out)
+			}
+		})
+	}
+	wg.Wait()
 
-	t.Run("nohup", func(t *testing.T) {
-		// Skip the nohup test below when running in tmux on darwin, since nohup
-		// doesn't work correctly there. See issue #5135.
-		if runtime.GOOS == "darwin" && os.Getenv("TMUX") != "" {
-			t.Skip("Skipping nohup test due to running in tmux on darwin")
-		}
+	Stop(c)
 
-		// Again, this time with nohup, assuming we can find it.
-		_, err := exec.LookPath("nohup")
-		if err != nil {
-			t.Skip("cannot find nohup; skipping second half of test")
-		}
+	// Skip the nohup test below when running in tmux on darwin, since nohup
+	// doesn't work correctly there. See issue #5135.
+	if runtime.GOOS == "darwin" && os.Getenv("TMUX") != "" {
+		t.Skip("Skipping nohup test due to running in tmux on darwin")
+	}
 
-		var subTimeout time.Duration
-		if deadline, ok := t.Deadline(); ok {
-			subTimeout = time.Until(deadline)
-			subTimeout -= subTimeout / 10 // Leave 10% headroom for propagating output.
-		}
-		for i := 1; i <= 2; i++ {
-			i := i
-			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				t.Parallel()
+	// Again, this time with nohup, assuming we can find it.
+	_, err := exec.LookPath("nohup")
+	if err != nil {
+		t.Skip("cannot find nohup; skipping second half of test")
+	}
 
-				// POSIX specifies that nohup writes to a file named nohup.out if standard
-				// output is a terminal. However, for an exec.Cmd, standard output is
-				// not a terminal — so we don't need to read or remove that file (and,
-				// indeed, cannot even create it if the current user is unable to write to
-				// GOROOT/src, such as when GOROOT is installed and owned by root).
+	wg.Add(2)
+	if deadline, ok := t.Deadline(); ok {
+		subTimeout = time.Until(deadline)
+		subTimeout -= subTimeout / 10 // Leave 10% headroom for propagating output.
+	}
+	for i := 1; i <= 2; i++ {
+		i := i
+		go t.Run(fmt.Sprintf("nohup-%d", i), func(t *testing.T) {
+			defer wg.Done()
 
-				args := []string{
-					os.Args[0],
-					"-test.v",
-					"-test.run=TestStop",
-					"-send_uncaught_sighup=" + strconv.Itoa(i),
-				}
-				if subTimeout != 0 {
-					args = append(args, fmt.Sprintf("-test.timeout=%v", subTimeout))
-				}
-				out, err := testenv.Command(t, "nohup", args...).CombinedOutput()
+			// POSIX specifies that nohup writes to a file named nohup.out if standard
+			// output is a terminal. However, for an exec.Command, standard output is
+			// not a terminal — so we don't need to read or remove that file (and,
+			// indeed, cannot even create it if the current user is unable to write to
+			// GOROOT/src, such as when GOROOT is installed and owned by root).
 
-				if err != nil {
-					// nohup doesn't work on new LUCI darwin builders due to the
-					// type of launchd service the test run under. See
-					// https://go.dev/issue/63875.
-					if runtime.GOOS == "darwin" && strings.Contains(string(out), "nohup: can't detach from console: Inappropriate ioctl for device") {
-						// TODO(go.dev/issue/63799): A false-positive in vet reports a
-						// t.Skip here as invalid. Switch back to t.Skip once fixed.
-						t.Logf("Skipping nohup test due to darwin builder limitation. See https://go.dev/issue/63875.")
-						return
-					}
+			args := []string{
+				os.Args[0],
+				"-test.v",
+				"-test.run=TestStop",
+				"-send_uncaught_sighup=" + strconv.Itoa(i),
+			}
+			if subTimeout != 0 {
+				args = append(args, fmt.Sprintf("-test.timeout=%v", subTimeout))
+			}
+			out, err := exec.Command("nohup", args...).CombinedOutput()
 
-					t.Errorf("ran test with -send_uncaught_sighup=%d under nohup and it failed: expected success.\nError: %v\nOutput:\n%s", i, err, out)
-				} else {
-					t.Logf("ran test with -send_uncaught_sighup=%d under nohup.\nOutput:\n%s", i, out)
-				}
-			})
-		}
-	})
+			if err != nil {
+				t.Errorf("ran test with -send_uncaught_sighup=%d under nohup and it failed: expected success.\nError: %v\nOutput:\n%s", i, err, out)
+			} else {
+				t.Logf("ran test with -send_uncaught_sighup=%d under nohup.\nOutput:\n%s", i, out)
+			}
+		})
+	}
+	wg.Wait()
 }
 
 // Test that SIGCONT works (issue 8953).

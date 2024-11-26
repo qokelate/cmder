@@ -500,21 +500,22 @@ func testVerify(t *testing.T, test verifyTest, useSystemRoots bool) {
 		return true
 	}
 
-	// Every expected chain should match one (or more) returned chain. We tolerate multiple
-	// matches, as due to root store semantics it is plausible that (at least on the system
-	// verifiers) multiple identical (looking) chains may be returned when two roots with the
-	// same subject are present.
+	// Every expected chain should match 1 returned chain
 	for _, expectedChain := range test.expectedChains {
-		var match bool
+		nChainMatched := 0
 		for _, chain := range chains {
 			if doesMatch(expectedChain, chain) {
-				match = true
-				break
+				nChainMatched++
 			}
 		}
 
-		if !match {
-			t.Errorf("No match found for %v", expectedChain)
+		if nChainMatched != 1 {
+			t.Errorf("Got %v matches instead of %v for expected chain %v", nChainMatched, 1, expectedChain)
+			for _, chain := range chains {
+				if doesMatch(expectedChain, chain) {
+					t.Errorf("\t matched %v", chainToDebugString(chain))
+				}
+			}
 		}
 	}
 

@@ -9,7 +9,6 @@ package runtime
 import "unsafe"
 
 var NonblockingPipe = nonblockingPipe
-var Fcntl = fcntl
 
 func sigismember(mask *sigset, i int) bool {
 	clear := *mask

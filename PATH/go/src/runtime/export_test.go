@@ -336,8 +336,6 @@ func ReadMetricsSlow(memStats *MemStats, samplesp unsafe.Pointer, len, cap int) 
 	startTheWorld()
 }
 
-var DoubleCheckReadMemStats = &doubleCheckReadMemStats
-
 // ReadMemStatsSlow returns both the runtime-computed MemStats and
 // MemStats accumulated by scanning the heap.
 func ReadMemStatsSlow() (base, slow MemStats) {

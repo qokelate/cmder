@@ -1,0 +1,8 @@
+#!/bin/zsh
+
+file=`cygpath -aw "/mnt/root/Command/xmod.cmd"`
+file2=`cygpath -aw "$1"`
+cmd.exe /d /c "$file" "$file2"
+
+exit
+

@@ -1,6 +1,6 @@
 
 export "EDITOR=zvim"
-export "PATH=$CMDROOT/PATH/Command:$PATH"
+export "PATH=$CMDROOT/PATH/bin:$PATH"
 export "PATH=$CMDROOT/PATH/bind-dig:$PATH"
 export "PATH=$CMDROOT/PATH/miniconda3:$PATH"
 export "PATH=$CMDROOT/PATH/SysinternalsSuite:$PATH"

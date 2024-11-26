@@ -1,0 +1,11 @@
+#!/bin/zsh
+
+if [ '' != "$1" ]; then
+  notepad2 "$(cygpath -aw "$1")" >/dev/null 2>/dev/null
+  exit
+fi
+
+notepad2 >/dev/null 2>/dev/null
+
+exit
+

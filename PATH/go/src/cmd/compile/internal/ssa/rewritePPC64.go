@@ -15554,19 +15554,17 @@ func rewriteValuePPC64_OpSelect0(v *Value) bool {
 		v.copyOf(y)
 		return true
 	}
-	// match: (Select0 (ANDCCconst [0xFF] (MOVBreg x)))
-	// result: (MOVBZreg x)
+	// match: (Select0 (ANDCCconst [0xFF] y:(MOVBreg _)))
+	// result: y
 	for {
 		if v_0.Op != OpPPC64ANDCCconst || auxIntToInt64(v_0.AuxInt) != 0xFF {
 			break
 		}
-		v_0_0 := v_0.Args[0]
-		if v_0_0.Op != OpPPC64MOVBreg {
+		y := v_0.Args[0]
+		if y.Op != OpPPC64MOVBreg {
 			break
 		}
-		x := v_0_0.Args[0]
-		v.reset(OpPPC64MOVBZreg)
-		v.AddArg(x)
+		v.copyOf(y)
 		return true
 	}
 	// match: (Select0 (ANDCCconst [c] y:(MOVHZreg _)))
@@ -15584,19 +15582,36 @@ func rewriteValuePPC64_OpSelect0(v *Value) bool {
 		v.copyOf(y)
 		return true
 	}
-	// match: (Select0 (ANDCCconst [0xFFFF] (MOVHreg x)))
-	// result: (MOVHZreg x)
+	// match: (Select0 (ANDCCconst [0xFFFF] y:(MOVHreg _)))
+	// result: y
 	for {
 		if v_0.Op != OpPPC64ANDCCconst || auxIntToInt64(v_0.AuxInt) != 0xFFFF {
 			break
 		}
+		y := v_0.Args[0]
+		if y.Op != OpPPC64MOVHreg {
+			break
+		}
+		v.copyOf(y)
+		return true
+	}
+	// match: (Select0 (ANDCCconst [c] (MOVBreg x)))
+	// result: (Select0 (ANDCCconst [c&0xFF] x))
+	for {
+		if v_0.Op != OpPPC64ANDCCconst {
+			break
+		}
+		c := auxIntToInt64(v_0.AuxInt)
 		v_0_0 := v_0.Args[0]
-		if v_0_0.Op != OpPPC64MOVHreg {
+		if v_0_0.Op != OpPPC64MOVBreg {
 			break
 		}
 		x := v_0_0.Args[0]
-		v.reset(OpPPC64MOVHZreg)
-		v.AddArg(x)
+		v.reset(OpSelect0)
+		v0 := b.NewValue0(v.Pos, OpPPC64ANDCCconst, types.NewTuple(typ.Int, types.TypeFlags))
+		v0.AuxInt = int64ToAuxInt(c & 0xFF)
+		v0.AddArg(x)
+		v.AddArg(v0)
 		return true
 	}
 	// match: (Select0 (ANDCCconst [c] (MOVBZreg x)))
@@ -15618,6 +15633,25 @@ func rewriteValuePPC64_OpSelect0(v *Value) bool {
 		v.AddArg(v0)
 		return true
 	}
+	// match: (Select0 (ANDCCconst [c] (MOVHreg x)))
+	// result: (Select0 (ANDCCconst [c&0xFFFF] x))
+	for {
+		if v_0.Op != OpPPC64ANDCCconst {
+			break
+		}
+		c := auxIntToInt64(v_0.AuxInt)
+		v_0_0 := v_0.Args[0]
+		if v_0_0.Op != OpPPC64MOVHreg {
+			break
+		}
+		x := v_0_0.Args[0]
+		v.reset(OpSelect0)
+		v0 := b.NewValue0(v.Pos, OpPPC64ANDCCconst, types.NewTuple(typ.Int, types.TypeFlags))
+		v0.AuxInt = int64ToAuxInt(c & 0xFFFF)
+		v0.AddArg(x)
+		v.AddArg(v0)
+		return true
+	}
 	// match: (Select0 (ANDCCconst [c] (MOVHZreg x)))
 	// result: (Select0 (ANDCCconst [c&0xFFFF] x))
 	for {
@@ -15633,6 +15667,25 @@ func rewriteValuePPC64_OpSelect0(v *Value) bool {
 		v.reset(OpSelect0)
 		v0 := b.NewValue0(v.Pos, OpPPC64ANDCCconst, types.NewTuple(typ.Int, types.TypeFlags))
 		v0.AuxInt = int64ToAuxInt(c & 0xFFFF)
+		v0.AddArg(x)
+		v.AddArg(v0)
+		return true
+	}
+	// match: (Select0 (ANDCCconst [c] (MOVWreg x)))
+	// result: (Select0 (ANDCCconst [c&0xFFFFFFFF] x))
+	for {
+		if v_0.Op != OpPPC64ANDCCconst {
+			break
+		}
+		c := auxIntToInt64(v_0.AuxInt)
+		v_0_0 := v_0.Args[0]
+		if v_0_0.Op != OpPPC64MOVWreg {
+			break
+		}
+		x := v_0_0.Args[0]
+		v.reset(OpSelect0)
+		v0 := b.NewValue0(v.Pos, OpPPC64ANDCCconst, types.NewTuple(typ.Int, types.TypeFlags))
+		v0.AuxInt = int64ToAuxInt(c & 0xFFFFFFFF)
 		v0.AddArg(x)
 		v.AddArg(v0)
 		return true

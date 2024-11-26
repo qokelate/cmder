@@ -1,0 +1,11 @@
+#!/bin/zsh
+
+arg='nohup '
+for a in "$@"; do
+  arg="$arg '$a'"
+done
+
+eval "$arg" >/dev/null 2>/dev/null &
+
+exit
+

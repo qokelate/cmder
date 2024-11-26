@@ -1,0 +1,5 @@
+#!/bin/zsh
+
+echo -n "$1" | base64 -D
+
+exit
