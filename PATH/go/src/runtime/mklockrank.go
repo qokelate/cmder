@@ -52,37 +52,28 @@ NONE <
   assistQueue,
   sweep;
 
-# Test only
-NONE < testR, testW;
-
 # Scheduler, timers, netpoll
-NONE <
-  allocmW,
-  execW,
-  cpuprof,
-  pollDesc;
+NONE < pollDesc, cpuprof;
 assistQueue,
   cpuprof,
   forcegc,
   pollDesc, # pollDesc can interact with timers, which can lock sched.
   scavenge,
   sweep,
-  sweepWaiters,
-  testR
-# Above SCHED are things that can call into the scheduler.
-< SCHED
-# Below SCHED is the scheduler implementation.
-< allocmR,
-  execR
+  sweepWaiters
 < sched;
 sched < allg, allp;
 allp < timers;
 timers < netpollInit;
 
 # Channels
-scavenge, sweep, testR < hchan;
+scavenge, sweep < hchan;
 NONE < notifyList;
 hchan, notifyList < sudog;
+
+# RWMutex
+NONE < rwmutexW;
+rwmutexW, sysmon < rwmutexR;
 
 # Semaphores
 NONE < root;
@@ -108,9 +99,6 @@ traceBuf < traceStrings;
 
 # Malloc
 allg,
-  allocmR,
-  execR, # May grow stack
-  execW, # May allocate after BeforeFork
   hchan,
   notifyList,
   reflectOffs,
@@ -145,7 +133,7 @@ gcBitsArenas,
 < STACKGROW
 # Below STACKGROW is the stack allocator/copying implementation.
 < gscan;
-gscan < stackpool;
+gscan, rwmutexR < stackpool;
 gscan < stackLarge;
 # Generally, hchan must be acquired before gscan. But in one case,
 # where we suspend a G and then shrink its stack, syncadjustsudogs
@@ -191,20 +179,6 @@ NONE < panic;
 # deadlock is not acquired while holding panic, but it also needs to be
 # below all other locks.
 panic < deadlock;
-
-# RWMutex internal read lock
-
-allocmR,
-  allocmW
-< allocmRInternal;
-
-execR,
-  execW
-< execRInternal;
-
-testR,
-  testW
-< testRInternal;
 `
 
 // cyclicRanks lists lock ranks that allow multiple locks of the same
