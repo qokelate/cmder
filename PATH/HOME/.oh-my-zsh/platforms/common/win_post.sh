@@ -10,6 +10,9 @@ export "PATH=$CMDROOT/PATH/Notepad2_v4.2.25:$PATH"
 export "PATH=$CMDROOT/PATH/scripts:$PATH"
 export "PATH=$CMDROOT/PATH/linux-utils:$PATH"
 
+export "GOROOT=$CMDROOT/PATH/go"
+export "PATH=$GOROOT/bin:$PATH"
+
 [ -f "$HOME/WinHome/.zshrc" ] || touch "$HOME/WinHome/.zshrc"
 source "$HOME/WinHome/.zshrc"
 
