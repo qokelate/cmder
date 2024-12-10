@@ -13,6 +13,9 @@ export "PATH=$CMDROOT/PATH/linux-utils:$PATH"
 export "GOROOT=$CMDROOT/PATH/go"
 export "PATH=$GOROOT/bin:$PATH"
 
+export "mingw64=$CMDROOT/PATH/mingw64"
+export "PATH=$mingw64/bin:$PATH"
+
 [ -f "$HOME/WinHome/.zshrc" ] || touch "$HOME/WinHome/.zshrc"
 source "$HOME/WinHome/.zshrc"
 
